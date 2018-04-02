@@ -47,7 +47,6 @@ func main() {
 		}
 		if src != nil {
 			goncurses.End()
-			fmt.Println("CLOSED")
 		}
 		signal.Stop(sc)
 		close(sc)
@@ -73,18 +72,22 @@ func main() {
 		e("error decoding configuration file", json.NewDecoder(f).Decode(&config))
 		e("error closing config file (reading)", f.Close())
 	}
+
+	client := NewClient(config.Cookies)
+
 	if len(config.Cookies) > 0 {
-		if err = ConfirmCookies(config.Cookies); err == ErrInvalidCookies {
+		if err = client.Resume(); err == ErrInvalidCookies {
 			config.Cookies = nil
 		} else if err != nil {
 			e("error validating cookies", err)
 		}
 	}
 	if len(config.Cookies) == 0 && config.Username != "" {
-		config.Cookies, err = Login(config.Username, config.Password)
+		err = client.Login(config.Username, config.Password)
 		if err != ErrInvalidLogin {
 			e("error logging in with saved credentials", err)
 		}
+		config.Cookies = client.GetCookies()
 	}
 	if len(config.Cookies) == 0 {
 		var username, password string
@@ -96,13 +99,14 @@ func main() {
 			goncurses.Echo(false)
 			password, _ = src.GetString(50)
 			goncurses.Echo(true)
-			config.Cookies, err = Login(username, password)
+			err = client.Login(username, password)
 			if err == ErrInvalidLogin {
 				src.Clear()
 				src.Println("Invalid Login Credentials")
 				continue
 			}
 			e("error logging in", err)
+			config.Cookies = client.GetCookies()
 			break
 		}
 		if config.SaveCredentials {
@@ -117,5 +121,4 @@ func main() {
 
 	cc <- struct{}{}
 	<-cc
-	fmt.Printf("%#V\n", config.Cookies)
 }

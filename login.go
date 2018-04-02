@@ -15,17 +15,34 @@ import (
 )
 
 const (
-	domain   = "https://www.messenger.com/"
-	loginURL = domain + "login"
+	cDomain   = "https://www.messenger.com/"
+	cLoginURL = cDomain + "login"
 )
 
-func ConfirmCookies(cookies []*http.Cookie) error {
-	var client http.Client
+var domain, loginURL *url.URL
+
+func init() {
+	domain, _ = url.Parse(cDomain)
+	loginURL, _ = url.Parse(cLoginURL)
+}
+
+type Client struct {
+	http.Client
+}
+
+func NewClient(cookies []*http.Cookie) *Client {
+	var client Client
 	client.Jar, _ = cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
-	d, _ := url.Parse(domain)
-	client.Jar.SetCookies(d, cookies)
-	client.CheckRedirect = noRedirect
-	resp, err := client.Get(loginURL)
+	if len(cookies) > 0 {
+		client.Jar.SetCookies(domain, cookies)
+	}
+	return &client
+}
+
+func (c *Client) Resume() error {
+	c.CheckRedirect = noRedirect
+	resp, err := c.Get(cLoginURL)
+	c.CheckRedirect = nil
 	if err != nil {
 		return err
 	}
@@ -35,18 +52,14 @@ func ConfirmCookies(cookies []*http.Cookie) error {
 	return nil
 }
 
-func Login(username, password string) ([]*http.Cookie, error) {
-	d, _ := url.Parse(domain)
-	u, _ := url.Parse(loginURL)
-	var client http.Client
-	client.Jar, _ = cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
-	resp, err := client.Get(loginURL)
+func (c *Client) Login(username, password string) error {
+	resp, err := c.Get(cLoginURL)
 	if err != nil {
-		return nil, errors.WithContext("error getting login page: ", err)
+		return errors.WithContext("error getting login page: ", err)
 	}
 	nodes, err := xmlpath.ParseHTML(resp.Body)
 	if err != nil {
-		return nil, errors.WithContext("error parsing login page: ", err)
+		return errors.WithContext("error parsing login page: ", err)
 	}
 	var cookieSet bool
 	for scripts := xmlpath.MustCompile("//script").Iter(nodes); scripts.Next(); {
@@ -54,7 +67,7 @@ func Login(username, password string) ([]*http.Cookie, error) {
 		if strings.Contains(node, "_js_datr") {
 			parts := strings.Split(regexp.MustCompile("\\[\"_js_datr\"[^\\]]*\\]").FindString(node), "\"")
 			if len(parts) > 3 {
-				client.Jar.SetCookies(d, []*http.Cookie{
+				c.Jar.SetCookies(domain, []*http.Cookie{
 					&http.Cookie{
 						Name:     "datr",
 						Value:    parts[3],
@@ -70,18 +83,18 @@ func Login(username, password string) ([]*http.Cookie, error) {
 		}
 	}
 	if !cookieSet {
-		return nil, errors.Error("error grabbing datr cookie")
+		return errors.Error("error grabbing datr cookie")
 
 	}
 	var postURL string
 	if loginURLP := xmlpath.MustCompile("//form/@action").Iter(nodes); loginURLP.Next() {
 		action, err := url.Parse(loginURLP.Node().String())
 		if err != nil {
-			return nil, errors.WithContext("error parsing login URL: ", err)
+			return errors.WithContext("error parsing login URL: ", err)
 		}
-		postURL = u.ResolveReference(action).String()
+		postURL = loginURL.ResolveReference(action).String()
 	} else {
-		return nil, errors.Error("error retrieving login POST URL")
+		return errors.Error("error retrieving login POST URL")
 	}
 
 	inputs := make(url.Values)
@@ -97,15 +110,14 @@ func Login(username, password string) ([]*http.Cookie, error) {
 	inputs.Set("pass", password)
 	inputs.Set("login", "1")
 	inputs.Set("persistant", "1")
-	client.CheckRedirect = noRedirect
-	resp, err = client.PostForm(postURL, inputs)
+	c.CheckRedirect = noRedirect
+	resp, err = c.PostForm(postURL, inputs)
 	if err != nil {
-		return nil, errors.WithContext("error POSTing login form: ", err)
+		return errors.WithContext("error POSTing login form: ", err)
 	}
-	cookies := client.Jar.Cookies(d)
 
 	var goodCookies bool
-	for _, cookie := range cookies {
+	for _, cookie := range c.GetCookies() {
 		if cookie.Name == "c_user" {
 			goodCookies = true
 			break
@@ -113,10 +125,14 @@ func Login(username, password string) ([]*http.Cookie, error) {
 	}
 
 	if !goodCookies {
-		return nil, ErrInvalidLogin
+		return ErrInvalidLogin
 	}
 
-	return cookies, nil
+	return nil
+}
+
+func (c *Client) GetCookies() []*http.Cookie {
+	return c.Jar.Cookies(domain)
 }
 
 func noRedirect(_ *http.Request, _ []*http.Request) error {
