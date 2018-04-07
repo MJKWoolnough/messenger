@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/MJKWoolnough/errors"
+	"github.com/robertkrimen/otto"
 	"golang.org/x/net/publicsuffix"
 	xmlpath "gopkg.in/xmlpath.v2"
 )
@@ -58,6 +58,7 @@ func (c *Client) Login(username, password string) error {
 		return errors.WithContext("error getting login page: ", err)
 	}
 	nodes, err := xmlpath.ParseHTML(resp.Body)
+	resp.Body.Close()
 	if err != nil {
 		return errors.WithContext("error parsing login page: ", err)
 	}
@@ -65,12 +66,36 @@ func (c *Client) Login(username, password string) error {
 	for scripts := xmlpath.MustCompile("//script").Iter(nodes); scripts.Next(); {
 		node := scripts.Node().String()
 		if strings.Contains(node, "_js_datr") {
-			parts := strings.Split(regexp.MustCompile("\\[\"_js_datr\"[^\\]]*\\]").FindString(node), "\"")
-			if len(parts) > 3 {
+			var value string
+			vm := otto.New()
+			vm.Set("setValue", func(call otto.FunctionCall) otto.Value {
+				value = call.Argument(0).String()
+				return otto.UndefinedValue()
+			})
+			vm.Run(`
+var require = function() {
+	return {
+		guard: function(a) {
+			return a;
+		}
+	};
+}, bigPipe = {
+	onPageletArrive: function (data) {
+		var r = data["jsmods"]["require"];
+		for (var i = 0; i < r.length; i++) {
+			if (r[i][0] === "CookieCore") {
+				setValue(r[i][3][1]);
+				break;
+			}
+		}
+	}
+};`)
+			vm.Run(node)
+			if value != "" {
 				c.Jar.SetCookies(domain, []*http.Cookie{
 					&http.Cookie{
 						Name:     "datr",
-						Value:    parts[3],
+						Value:    value,
 						Path:     "/",
 						Expires:  time.Now().Add(time.Hour * 48),
 						HttpOnly: true,
@@ -78,8 +103,8 @@ func (c *Client) Login(username, password string) error {
 					},
 				})
 				cookieSet = true
-				break
 			}
+			break
 		}
 	}
 	if !cookieSet {
