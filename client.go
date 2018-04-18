@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"strings"
+	"strconv"
 	"time"
 
 	"github.com/MJKWoolnough/errors"
@@ -17,17 +17,21 @@ import (
 const (
 	cDomain   = "https://www.messenger.com/"
 	cLoginURL = cDomain + "login"
+	cAPIURL   = cDomain + "api/graphql"
 )
 
-var domain, loginURL *url.URL
+var domain, loginURL, apiURL *url.URL
 
 func init() {
 	domain, _ = url.Parse(cDomain)
 	loginURL, _ = url.Parse(cLoginURL)
+	apiURL, _ = url.Parse(cAPIURL)
 }
 
 type Client struct {
 	http.Client
+	request uint64
+	userID  uint64
 }
 
 func NewClient(cookies []*http.Cookie) *Client {
@@ -62,55 +66,33 @@ func (c *Client) Login(username, password string) error {
 	if err != nil {
 		return errors.WithContext("error parsing login page: ", err)
 	}
-	var cookieSet bool
-	for scripts := xmlpath.MustCompile("//script").Iter(nodes); scripts.Next(); {
-		node := scripts.Node().String()
-		if strings.Contains(node, "_js_datr") {
-			var value string
-			vm := otto.New()
-			vm.Set("setValue", func(call otto.FunctionCall) otto.Value {
-				value = call.Argument(0).String()
-				return otto.UndefinedValue()
-			})
-			vm.Run(`
-var require = function() {
-	return {
-		guard: function(a) {
-			return a;
-		}
-	};
-}, bigPipe = {
-	onPageletArrive: function (data) {
-		var r = data["jsmods"]["require"];
-		for (var i = 0; i < r.length; i++) {
-			if (r[i][0] === "CookieCore") {
-				setValue(r[i][3][1]);
-				break;
-			}
-		}
-	}
-};`)
-			vm.Run(node)
-			if value != "" {
-				c.Jar.SetCookies(domain, []*http.Cookie{
-					&http.Cookie{
-						Name:     "datr",
-						Value:    value,
-						Path:     "/",
-						Expires:  time.Now().Add(time.Hour * 48),
-						HttpOnly: true,
-						Secure:   true,
-					},
-				})
-				cookieSet = true
-			}
-			break
-		}
+	var (
+		cookieSet   bool
+		cookieValue string
+	)
+	vm := otto.New()
+	vm.Set("setValue", func(call otto.FunctionCall) otto.Value {
+		cookieSet = true
+		cookieValue = call.Argument(0).String()
+		return otto.UndefinedValue()
+	})
+	for scripts := xmlpath.MustCompile("//body/script").Iter(nodes); scripts.Next(); {
+		vm.Run(scripts.Node().String())
 	}
 	if !cookieSet {
 		return errors.Error("error grabbing datr cookie")
 
 	}
+	c.Jar.SetCookies(domain, []*http.Cookie{
+		&http.Cookie{
+			Name:     "datr",
+			Value:    cookieValue,
+			Path:     "/",
+			Expires:  time.Now().Add(time.Hour * 48),
+			HttpOnly: true,
+			Secure:   true,
+		},
+	})
 	var postURL string
 	if loginURLP := xmlpath.MustCompile("//form/@action").Iter(nodes); loginURLP.Next() {
 		action, err := url.Parse(loginURLP.Node().String())
@@ -144,6 +126,10 @@ var require = function() {
 	var goodCookies bool
 	for _, cookie := range c.GetCookies() {
 		if cookie.Name == "c_user" {
+			c.userID, err = strconv.ParseUint(cookie.Value, 10, 64)
+			if err != nil {
+				return errors.WithContext("error parsing userID:", err)
+			}
 			goodCookies = true
 			break
 		}
