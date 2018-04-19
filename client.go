@@ -177,7 +177,9 @@ func (c *Client) init() error {
 	var (
 		udSet, dtsgSet, sdSet, snSet bool
 		sprinkleName, sprinkleValue  string
+		highestBit                   int64
 	)
+	bitmap := make(map[int64]struct{})
 
 	c.postData = make(url.Values)
 	c.postData.Set("__a", "1")
@@ -209,6 +211,14 @@ func (c *Client) init() error {
 				snSet = true
 				return otto.UndefinedValue()
 			},
+			"setBitmap": func(call otto.FunctionCall) otto.Value {
+				i, _ := call.Argument(0).ToInteger()
+				bitmap[i] = struct{}{}
+				if i > highestBit {
+					highestBit = i
+				}
+				return otto.UndefinedValue()
+			},
 		},
 		pageScripts.Iter(nodes),
 	); err != nil {
@@ -233,8 +243,15 @@ func (c *Client) init() error {
 	for _, char := range sprinkleValue {
 		fmt.Fprint(&buf, char)
 	}
-
 	c.postData.Set(sprinkleName, string(buf))
+
+	_, set := bitmap[0]
+	r := NewRLE(set)
+	for i := int64(1); i < highestBit; i++ {
+		_, set = bitmap[i]
+		r.WriteBool(set)
+	}
+	c.postData.Set("__dyn", r.String())
 
 	return nil
 }

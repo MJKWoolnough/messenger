@@ -21,17 +21,22 @@ setDTSGToken = function() {},
 setSiteData = function() {},
 setCookieData = function() {},
 setSprinkleName = function() {},
-setValue = function() {},
+setBitmap = function() {},
 requireObj = {
 	lastID: "",
         guard: function(a) {
                 return a;
         },
 	handle: function() {},
-        handleDefines: function(data, ) {
+        handleDefines: function(data, b) {
 		if (this.lastID === "ServerJSDefine") {
 			for (var i = 0; i < data.length; i++) {
-				var o = data[i][2];
+				var o = data[i][2],
+				    e = b;
+				if (data[i].length > 3) {
+					e = data[i][3];
+				}
+				setBitmap(e);
 				switch (data[i][0]) {
 				case "CurrentUserInitialData":
 					setUserData(o["USER_ID"], o["NAME"], o["SHORT_NAME"]);
@@ -49,9 +54,16 @@ requireObj = {
 			}
 		}
 	},
-        handleServerJS: function(a) {
-               setValue(JSON.stringify(a));
-        }
+        handleServerJS: function(data) {
+		if (data && data["jsmods"]) {
+			if (data["jsmods"]["define"]) {
+				var d = data["jsmods"]["define"];
+				for (var i = 0; i < r.length; i++) {
+					setBitmap(d[i][3]);
+				}
+			}
+		}
+	}
 },
 requireConstructor = function(){},
 requireLazy = function() {},
@@ -68,12 +80,20 @@ require = function(id) {
 },
 bigPipe = {
         onPageletArrive: function (data) {
-		if (data && data["jsmods"] && data["jsmods"]["require"]) {
-                	var r = data["jsmods"]["require"];
-			for (var i = 0; i < r.length; i++) {
-				if (r[i][0] === "CookieCore") {
-					setCookieValue(r[i][3][1]);
-					break;
+		if (data && data["jsmods"]) {
+			if (data["jsmods"]["require"]) {
+				var r = data["jsmods"]["require"];
+				for (var i = 0; i < r.length; i++) {
+					if (r[i][0] === "CookieCore") {
+						setCookieValue(r[i][3][1]);
+						break;
+					}
+				}
+			}
+			if (data["jsmods"]["define"]) {
+				var d = data["jsmods"]["define"];
+				for (var i = 0; i < r.length; i++) {
+					setBitmap(d[i][3]);
 				}
 			}
 		}
