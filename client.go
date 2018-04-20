@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,6 +41,7 @@ type Client struct {
 	http.Client
 	postData                url.Values
 	username, usernameShort string
+	docIDs                  map[string]string
 
 	requestMu sync.Mutex
 	request   uint64
@@ -88,7 +91,7 @@ func (c *Client) Login(username, password string) error {
 				return otto.UndefinedValue()
 			},
 		},
-		pageScripts.Iter(nodes),
+		xmlPathIter{pageScripts.Iter(nodes)},
 	); err != nil {
 		return errors.WithContext("error grabbing datr cookie: ", err)
 	}
@@ -180,6 +183,7 @@ func (c *Client) init() error {
 		highestBit                   int64
 	)
 	bitmap := make(map[int64]struct{})
+	resources := make(map[string][]string)
 
 	c.postData = make(url.Values)
 	c.postData.Set("__a", "1")
@@ -219,8 +223,13 @@ func (c *Client) init() error {
 				}
 				return otto.UndefinedValue()
 			},
+			"setResource": func(call otto.FunctionCall) otto.Value {
+				key := call.Argument(0).String()
+				resources[key] = append(resources[key], call.Argument(1).String())
+				return otto.UndefinedValue()
+			},
 		},
-		pageScripts.Iter(nodes),
+		xmlPathIter{pageScripts.Iter(nodes)},
 	); err != nil {
 		return errors.WithContext("error getting init values: ", err)
 	}
@@ -252,6 +261,43 @@ func (c *Client) init() error {
 		r.WriteBool(set)
 	}
 	c.postData.Set("__dyn", r.String())
+
+	loaded := make(map[string]struct{})
+	si := make(stringIter, 0, 100)
+	var sb strings.Builder
+
+	for _, resource := range resources {
+		for _, url := range resource {
+			if _, ok := loaded[url]; !ok {
+				resp, err := c.Get(url)
+				if err != nil {
+					return errors.WithContext("error getting resource: ", err)
+				}
+				_, err = io.Copy(&sb, resp.Body)
+				resp.Body.Close()
+				if err != nil {
+					return errors.WithContext("error reading resource: ", err)
+				}
+				si = append(si, sb.String())
+				sb.Reset()
+				loaded[url] = struct{}{}
+			}
+		}
+	}
+
+	c.docIDs = make(map[string]string, len(resources))
+
+	if err = runCode( // currently using patched version of "github.com/robertkrimen/otto/parser".TransformRegExp to lookahead errors
+		jsFuncs{
+			"setID": func(call otto.FunctionCall) otto.Value {
+				c.docIDs[call.Argument(0).String()] = call.Argument(1).String()
+				return otto.UndefinedValue()
+			},
+		},
+		&si,
+	); err != nil {
+		return errors.WithContext("error running resource scripts: ", err)
+	}
 
 	return nil
 }
