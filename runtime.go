@@ -1,11 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/MJKWoolnough/errors"
 	"github.com/robertkrimen/otto"
+	"github.com/robertkrimen/otto/parser"
 	"github.com/robertkrimen/otto/registry"
 	xmlpath "gopkg.in/xmlpath.v2"
 )
@@ -242,11 +242,13 @@ func runCode(funcs jsFuncs, scripts Iter) (err error) {
 		}
 	}()
 	for scripts.Next() {
-		scr := scripts.Node().String()
-		_, err = vm.Run(scr)
+		program, err := parser.ParseFile(nil, "", scripts.Node().String(), parser.IgnoreRegExpErrors)
+		if err != nil {
+			return errors.WithContext("error parsing script: ", err)
+		}
+		_, err = vm.Run(program)
 		reset <- true
 		if err != nil {
-			fmt.Println(scr)
 			if strerr, ok := err.(interface {
 				String() string
 			}); ok {
