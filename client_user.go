@@ -19,14 +19,14 @@ func (g Gender) String() string {
 	}
 }
 
-func GetGender(gender string) Gender {
+func getGender(gender string) Gender {
 	switch gender {
 	case "MALE":
 		return GenderMale
 	case "FEMALE":
 		return GenderFemale
 	default:
-		return GenderNeutral
+		return GenderNeuter
 	}
 }
 
@@ -34,5 +34,13 @@ type User struct {
 	ID                        string
 	Name, ShortName, Username string
 	Gender                    Gender
-	Nickname                  string
+}
+
+func (c *Client) SetUser(u User) {
+	c.dataMu.Lock()
+	defer c.dataMu.Unlock()
+	if _, ok := c.Users[u.ID]; ok {
+		return
+	}
+	c.Users[u.ID] = u
 }
