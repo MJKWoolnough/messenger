@@ -23,7 +23,7 @@ const CLIENT_VERSION = 3822019
 const (
 	cDomain   = "https://www.messenger.com/"
 	cLoginURL = cDomain + "login"
-	cAPIURL   = cDomain + "api/graphql"
+	cAPIURL   = cDomain + "api/graphqlbatch"
 )
 
 var (
@@ -42,6 +42,10 @@ type Client struct {
 	postData                url.Values
 	username, usernameShort string
 	docIDs                  map[string]string
+
+	dataMu  sync.RWMutex
+	Threads []Thread
+	Users   map[string]User
 
 	requestMu sync.Mutex
 	request   uint64
@@ -287,7 +291,7 @@ func (c *Client) init() error {
 
 	c.docIDs = make(map[string]string, len(resources))
 
-	if err = runCode( // currently using patched version of "github.com/robertkrimen/otto/parser".TransformRegExp to lookahead errors
+	if err = runCode(
 		jsFuncs{
 			"setID": func(call otto.FunctionCall) otto.Value {
 				c.docIDs[call.Argument(0).String()] = call.Argument(1).String()
@@ -299,6 +303,7 @@ func (c *Client) init() error {
 		return errors.WithContext("error running resource scripts: ", err)
 	}
 
+	c.Users = make(map[string]User)
 	return nil
 }
 
@@ -312,10 +317,6 @@ func (c *Client) PostForm(url string, data url.Values) (*http.Response, error) {
 	c.requestMu.Unlock()
 	data.Set("__req", strconv.FormatUint(req, 36))
 	return c.Client.PostForm(url, data)
-}
-
-func (c *Client) GetList() error {
-	return nil
 }
 
 const (
