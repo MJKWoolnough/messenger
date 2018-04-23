@@ -138,8 +138,9 @@ func (c *Client) GetList() error {
 	if err != nil {
 		return errors.WithContext("error decoding thread list: ", err)
 	}
-	for _, node := range list.List.Data.Viewer.MessageThreads.Nodes {
-		thread := Thread{
+	c.Threads = make([]Thread, len(list.List.Data.Viewer.MessageThreads.Nodes))
+	for n, node := range list.List.Data.Viewer.MessageThreads.Nodes {
+		c.Threads[n] = Thread{
 			ID:                       node.ThreadKey.ThreadFBID,
 			Type:                     getThreadType(node.ThreadType),
 			Participants:             make([]string, 0, len(node.Participants.Nodes)),
@@ -150,9 +151,9 @@ func (c *Client) GetList() error {
 		}
 		if len(node.LastMessage.Nodes) > 0 {
 			lm := node.LastMessage.Nodes[0]
-			thread.LastMessage.Sender = lm.MessageSender.MessagingActor.ID
-			thread.LastMessage.Snippet = lm.Snippet
-			thread.LastMessage.Time = unixToTime(lm.Timestamp)
+			c.Threads[n].LastMessage.Sender = lm.MessageSender.MessagingActor.ID
+			c.Threads[n].LastMessage.Snippet = lm.Snippet
+			c.Threads[n].LastMessage.Time = unixToTime(lm.Timestamp)
 		}
 		for _, user := range node.Participants.Nodes {
 			c.SetUser(User{
@@ -162,10 +163,10 @@ func (c *Client) GetList() error {
 				Username:  user.MessagingActor.Username,
 				Gender:    getGender(user.MessagingActor.Gender),
 			})
-			thread.Participants = append(thread.Participants, user.MessagingActor.ID)
+			c.Threads[n].Participants = append(c.Threads[n].Participants, user.MessagingActor.ID)
 		}
 		for _, cparts := range node.Customisation.Participants {
-			thread.ParticipantCustomisation[cparts.ID] = cparts.Nickname
+			c.Threads[n].ParticipantCustomisation[cparts.ID] = cparts.Nickname
 		}
 	}
 	return nil
