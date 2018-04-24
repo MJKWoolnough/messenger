@@ -9,8 +9,6 @@ import (
 	"os/signal"
 	"os/user"
 	"path/filepath"
-
-	"github.com/rthornton128/goncurses"
 )
 
 func e(explain string, err error) {
@@ -30,8 +28,7 @@ type Config struct {
 }
 
 var (
-	src *goncurses.Window
-	cc  = make(chan struct{})
+	cc = make(chan struct{})
 )
 
 func main() {
@@ -45,9 +42,7 @@ func main() {
 			end = true
 		case <-cc:
 		}
-		if src != nil {
-			goncurses.End()
-		}
+		UI.Quit()
 		signal.Stop(sc)
 		close(sc)
 		close(cc)
@@ -56,9 +51,7 @@ func main() {
 		}
 	}()
 
-	var err error
-	src, err = goncurses.Init()
-	e("error initialising ncurses", err)
+	e("error initialising ncurses", UI.Init())
 
 	var configFile string
 	usr, err := user.Current()
@@ -91,18 +84,12 @@ func main() {
 	}
 	if len(config.Cookies) == 0 {
 		var username, password string
-		src.Println()
 		for {
-			src.Printf("Enter Username: ")
-			username, _ = src.GetString(50)
-			src.Printf("Enter Password: ")
-			goncurses.Echo(false)
-			password, _ = src.GetString(50)
-			goncurses.Echo(true)
+			username, password, err = UI.GetUserPass()
+			e("error getting username/password: ", err)
 			err = client.Login(username, password)
 			if err == ErrInvalidLogin {
-				src.Clear()
-				src.Println("Invalid Login Credentials")
+				UI.ShowError("Invalid Login Credentials")
 				continue
 			}
 			e("error logging in", err)
@@ -118,6 +105,8 @@ func main() {
 	e("error opening config file for writing", err)
 	e("error encoding config file", json.NewEncoder(f).Encode(config))
 	e("error closing config file (writing)", f.Close())
+
+	e("error getting list", client.GetList())
 
 	cc <- struct{}{}
 	<-cc
