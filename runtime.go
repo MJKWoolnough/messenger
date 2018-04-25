@@ -112,6 +112,11 @@ __d = function(name, requires, func) {
 		func(null, function(){}, null, null, obj, null);
 		setID("MessengerGraphQLThreadlistFetcher", obj.exports.__getDocID());
 		break;
+	case "MessengerThreadsWebGraphQLQuery":
+		var obj = {};
+		func(null, function(){}, null, null, obj, null);
+		setID("MessengerGraphQLThreadFetcher", obj.exports.__getDocID());
+		break;
 	}
 },
 bigPipe = {
