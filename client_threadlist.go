@@ -39,6 +39,18 @@ func getThreadType(t string) ThreadType {
 	}
 }
 
+type apiError struct {
+	Code         int    `json:"code"`
+	APIErrorCode int    `json:"api_error_code"`
+	Summary      string `json:"summary"`
+	Description  string `json:"description"`
+	DebugInfo    string `json:"debug_info"`
+}
+
+func (a apiError) Error() string {
+	return a.Description
+}
+
 type threadList struct {
 	List struct {
 		Data struct {
@@ -46,7 +58,8 @@ type threadList struct {
 				MessageThreads struct {
 					Nodes []struct {
 						ThreadKey struct {
-							ThreadFBID string `json:"thread_fbid"`
+							ThreadFBID  string `json:"thread_fbid"`
+							OtherUserID string `json:"other_user_id"`
 						} `json:"thread_key"`
 						Name        string `json:"name"`
 						LastMessage struct {
@@ -107,10 +120,12 @@ type threadList struct {
 			} `json:"viewer"`
 		} `json:"data"`
 	} `json:"o0"`
+	Error apiError `json:"error"`
 }
 
 type Thread struct {
 	ID                        string
+	Name                      string
 	Type                      ThreadType
 	Participants              []string
 	ParticipantCustomisation  map[string]string
@@ -138,10 +153,14 @@ func (c *Client) GetList() error {
 	if err != nil {
 		return errors.WithContext("error decoding thread list: ", err)
 	}
+	if list.Error.APIErrorCode != 0 {
+		return list.Error
+	}
 	c.Threads = make([]Thread, len(list.List.Data.Viewer.MessageThreads.Nodes))
 	for n, node := range list.List.Data.Viewer.MessageThreads.Nodes {
 		c.Threads[n] = Thread{
 			ID:                       node.ThreadKey.ThreadFBID,
+			Name:                     node.Name,
 			Type:                     getThreadType(node.ThreadType),
 			Participants:             make([]string, 0, len(node.Participants.Nodes)),
 			ParticipantCustomisation: make(map[string]string, len(node.Customisation.Participants)),
@@ -164,6 +183,10 @@ func (c *Client) GetList() error {
 				Gender:    getGender(user.MessagingActor.Gender),
 			})
 			c.Threads[n].Participants = append(c.Threads[n].Participants, user.MessagingActor.ID)
+		}
+		if c.Threads[n].Type == ThreadOneToOne {
+			c.Threads[n].ID = node.ThreadKey.OtherUserID
+			c.Threads[n].Name = c.Users[node.ThreadKey.OtherUserID].Name
 		}
 		for _, cparts := range node.Customisation.Participants {
 			c.Threads[n].ParticipantCustomisation[cparts.ID] = cparts.Nickname
