@@ -195,6 +195,70 @@ func (c *Client) GetList() error {
 	return nil
 }
 
+type messages struct {
+	List struct {
+		Data struct {
+			MessageThread struct {
+				UnreadCount  int    `json:"unread_count"`
+				MessageCount int    `json:"message_count"`
+				UpdatedTime  string `json:"updated_time_precise"`
+				Messages     struct {
+					PageInfo struct {
+						HasPreviousPage bool `json:"has_previous_page"`
+					} `json:"page_info"`
+					Nodes []struct {
+						TypeName string `json:"__typename"`
+						Sender   struct {
+							ID    string `json:"id"`
+							Email string `json:"email"`
+						} `json:"message_sender"`
+						Timestamp string `json:"timestamp_precise"`
+						Unread    bool   `json:"unread"`
+						Message   struct {
+							Text string `json:"text"`
+						} `json:"message"`
+						EMAdminText struct {
+							TypeName    string `json:"__typename"`       // ADD_CONTACT, ACCEPT_PENDING_THREAD
+							AddedID     string `json:"contact_added_id"` // Message request of...
+							AdderID     string `json:"contact_adder_id"` // Message request by...
+							AccepterID  string `json:"accepter_id"`      // Message accepted by...
+							RequesterID string `json:"requester_id"`     // Message accepted of...
+						} `json:"extensible_message_admin_text"`
+						EMAdminTextType string `json:"extensible_message_admin_text_type"`
+						Snippet         string `json:"snippet"`
+					} `json:"nodes"`
+				} `json:"messages"`
+			} `json:"message_thread"`
+		} `json:"data"`
+	} `json:"o0"`
+	Error apiError `json:"error"`
+}
+
+type Message struct {
+}
+
+type Messages []Message
+
+func (c *Client) GetThread(id string) error {
+	post := make(url.Values)
+	post.Set("batch_name", "MessengerGraphQLThreadFetcher")
+	post.Set("queries", fmt.Sprintf("{\"o0\":{\"doc_id\":%q,\"query_params\":{\"id\":%q,\"message_limit\":20,\"load_messages\":1,\"load_read_receipts\":false,\"before\":null}}}", c.docIDs["MessengerGraphQLThreadFetcher"], id))
+	resp, err := c.PostForm(cAPIURL, post)
+	if err != nil {
+		return errors.WithContext("error getting thread messages: ", err)
+	}
+	var list messages
+	err = json.NewDecoder(resp.Body).Decode(&list)
+	if err != nil {
+		return errors.WithContext("error decoding thread message list: ", err)
+	}
+	if list.Error.APIErrorCode != 0 {
+		return list.Error
+	}
+	//ms := make(Messages, len(list.List.Data.MessageThread.Messages.Nodes))
+	return nil
+}
+
 func unixToTime(str string) time.Time {
 	if len(str) < 3 {
 		return time.Unix(0, 0)
