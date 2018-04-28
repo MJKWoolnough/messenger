@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -192,7 +193,7 @@ func (c *Client) init() error {
 	c.postData = make(url.Values)
 	c.postData.Set("__a", "1")
 	c.postData.Set("__rev", strconv.FormatUint(CLIENT_VERSION, 10))
-
+	var list threadList
 	if err = runCode(
 		jsFuncs{
 			"setUserData": func(call otto.FunctionCall) otto.Value {
@@ -232,6 +233,10 @@ func (c *Client) init() error {
 				resources[key] = append(resources[key], call.Argument(1).String())
 				return otto.UndefinedValue()
 			},
+			"setThreadData": func(call otto.FunctionCall) otto.Value {
+				json.NewDecoder(strings.NewReader(call.Argument(0).String())).Decode(&list)
+				return otto.UndefinedValue()
+			},
 		},
 		xmlPathIter{pageScripts.Iter(nodes)},
 	); err != nil {
@@ -249,6 +254,10 @@ func (c *Client) init() error {
 	}
 	if err != nil {
 		return errors.WithContext("error getting init config: ", err)
+	}
+
+	if err = c.parseThreadData(list); err != nil {
+		return err
 	}
 
 	buf := make(memio.Buffer, 1, 3*len(sprinkleValue)+1)

@@ -24,6 +24,7 @@ setSprinkleName = function() {},
 setBitmap = function() {},
 setResource = function() {},
 setID = function() {},
+setThreadData = function() {},
 requireObj = {
 	lastID: "",
         guard: function(a) {
@@ -57,12 +58,19 @@ requireObj = {
 		}
 	},
         handleServerJS: function(data) {
-		if (data && data["jsmods"]) {
-			if (data["jsmods"]["define"]) {
-				var d = data["jsmods"]["define"];
-				for (var i = 0; i < r.length; i++) {
-					setBitmap(d[i][3]);
+		if (data)
+			if (data["jsmods"]) {
+				if (data["jsmods"]["define"]) {
+					var d = data["jsmods"]["define"];
+					for (var i = 0; i < r.length; i++) {
+						setBitmap(d[i][3]);
+					}
 				}
+			}
+			if (data["require"] && data["require"].length > 1) {
+				var obj = {o0: {}};
+				obj.data = data["require"][1]["thread_list"];
+				setThreadData(JSON.stringify(obj));
 			}
 		}
 	}

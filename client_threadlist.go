@@ -156,6 +156,10 @@ func (c *Client) GetList() error {
 	if list.Error.APIErrorCode != 0 {
 		return list.Error
 	}
+	return c.parseThreadData(list)
+}
+
+func (c *Client) parseThreadData(list threadList) error {
 	c.Threads = make([]Thread, len(list.List.Data.Viewer.MessageThreads.Nodes))
 	for n, node := range list.List.Data.Viewer.MessageThreads.Nodes {
 		c.Threads[n] = Thread{
