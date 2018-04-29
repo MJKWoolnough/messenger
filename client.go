@@ -45,7 +45,7 @@ type Client struct {
 	docIDs                  map[string]string
 
 	dataMu  sync.RWMutex
-	Threads []Thread
+	Threads map[string]Thread
 	Users   map[string]User
 
 	requestMu sync.Mutex
@@ -256,6 +256,7 @@ func (c *Client) init() error {
 		return errors.WithContext("error getting init config: ", err)
 	}
 
+	c.Threads = make(map[string]Thread, len(list.List.Data.Viewer.MessageThreads.Nodes))
 	if err = c.parseThreadData(list); err != nil {
 		return err
 	}

@@ -138,7 +138,7 @@ type Thread struct {
 	}
 }
 
-func (c *Client) GetList() error {
+func (c *Client) UpdateThreadList() error {
 	post := make(url.Values)
 	post.Set("batch_name", "MessengerGraphQLThreadlistFetcher")
 	post.Set("queries", fmt.Sprintf("{\"o0\":{\"doc_id\":%q,\"query_params\":{\"limit\":99,\"before\":null,\"tags\":[],\"isWorkUser\":0,\"includeDeliveryReceipts\":true,\"includeSeqID\":false}}}", c.docIDs["MessengerGraphQLThreadlistFetcher"]))
@@ -160,9 +160,9 @@ func (c *Client) GetList() error {
 }
 
 func (c *Client) parseThreadData(list threadList) error {
-	c.Threads = make([]Thread, len(list.List.Data.Viewer.MessageThreads.Nodes))
-	for n, node := range list.List.Data.Viewer.MessageThreads.Nodes {
-		c.Threads[n] = Thread{
+	c.dataMu.Lock()
+	for _, node := range list.List.Data.Viewer.MessageThreads.Nodes {
+		thread := Thread{
 			ID:                       node.ThreadKey.ThreadFBID,
 			Name:                     node.Name,
 			Type:                     getThreadType(node.ThreadType),
@@ -174,9 +174,9 @@ func (c *Client) parseThreadData(list threadList) error {
 		}
 		if len(node.LastMessage.Nodes) > 0 {
 			lm := node.LastMessage.Nodes[0]
-			c.Threads[n].LastMessage.Sender = lm.MessageSender.MessagingActor.ID
-			c.Threads[n].LastMessage.Snippet = lm.Snippet
-			c.Threads[n].LastMessage.Time = unixToTime(lm.Timestamp)
+			thread.LastMessage.Sender = lm.MessageSender.MessagingActor.ID
+			thread.LastMessage.Snippet = lm.Snippet
+			thread.LastMessage.Time = unixToTime(lm.Timestamp)
 		}
 		for _, user := range node.Participants.Nodes {
 			c.SetUser(User{
@@ -186,16 +186,18 @@ func (c *Client) parseThreadData(list threadList) error {
 				Username:  user.MessagingActor.Username,
 				Gender:    getGender(user.MessagingActor.Gender),
 			})
-			c.Threads[n].Participants = append(c.Threads[n].Participants, user.MessagingActor.ID)
+			thread.Participants = append(thread.Participants, user.MessagingActor.ID)
 		}
-		if c.Threads[n].Type == ThreadOneToOne {
-			c.Threads[n].ID = node.ThreadKey.OtherUserID
-			c.Threads[n].Name = c.Users[node.ThreadKey.OtherUserID].Name
+		if thread.Type == ThreadOneToOne {
+			thread.ID = node.ThreadKey.OtherUserID
+			thread.Name = c.Users[node.ThreadKey.OtherUserID].Name
 		}
 		for _, cparts := range node.Customisation.Participants {
-			c.Threads[n].ParticipantCustomisation[cparts.ID] = cparts.Nickname
+			thread.ParticipantCustomisation[cparts.ID] = cparts.Nickname
 		}
+		c.Threads[thread.ID] = thread
 	}
+	c.dataMu.Unlock()
 	return nil
 }
 
