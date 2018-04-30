@@ -21,7 +21,7 @@ type RLE struct {
 func NewRLE(start bool) *RLE {
 	r := &RLE{
 		curr:  start,
-		buf:   make(boolmap.Slice, 128),
+		buf:   make(boolmap.Slice, 256),
 		pos:   1,
 		count: 1,
 	}
