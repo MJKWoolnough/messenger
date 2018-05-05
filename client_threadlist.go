@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"sort"
 	"strconv"
 	"time"
 
@@ -241,28 +242,50 @@ type messages struct {
 }
 
 type Message struct {
+	Message, Sender string
+	Time            time.Time
 }
 
 type Messages []Message
 
-func (c *Client) GetThread(id string) error {
+func (m Message) Len() int {
+	return len(m)
+}
+
+func (m Messages) Less(i, j int) bool {
+	return m[i].Time.Before(m[j].Time)
+}
+
+func (m Messages) Swap(i, j int) {
+	m[i], m[j] = m[j], m[i]
+}
+
+func (c *Client) GetThread(id string) (Messages, error) {
 	post := make(url.Values)
 	post.Set("batch_name", "MessengerGraphQLThreadFetcher")
 	post.Set("queries", fmt.Sprintf("{\"o0\":{\"doc_id\":%q,\"query_params\":{\"id\":%q,\"message_limit\":20,\"load_messages\":1,\"load_read_receipts\":false,\"before\":null}}}", c.docIDs["MessengerGraphQLThreadFetcher"], id))
 	resp, err := c.PostForm(cAPIURL, post)
 	if err != nil {
-		return errors.WithContext("error getting thread messages: ", err)
+		return nil, errors.WithContext("error getting thread messages: ", err)
 	}
 	var list messages
 	err = json.NewDecoder(resp.Body).Decode(&list)
 	if err != nil {
-		return errors.WithContext("error decoding thread message list: ", err)
+		return nil, errors.WithContext("error decoding thread message list: ", err)
 	}
 	if list.Error.APIErrorCode != 0 {
-		return list.Error
+		return nil, list.Error
 	}
-	//ms := make(Messages, len(list.List.Data.MessageThread.Messages.Nodes))
-	return nil
+	ms := make(Messages, len(list.List.Data.MessageThread.Messages.Nodes))
+	for _, node := range list.List.Data.MessageThread.Messages.Nodes {
+		ms = append(ms, Message{
+			Message: node.Message.Text,
+			Sender:  node.Sender,
+			Time:    unixToTime(node.Timestamp),
+		})
+	}
+	sort.Sort(ms)
+	return ms, nil
 }
 
 func unixToTime(str string) time.Time {
