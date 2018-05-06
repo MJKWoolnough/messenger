@@ -58,7 +58,7 @@ requireObj = {
 		}
 	},
         handleServerJS: function(data) {
-		if (data)
+		if (data) {
 			if (data["jsmods"]) {
 				if (data["jsmods"]["define"]) {
 					var d = data["jsmods"]["define"];
@@ -67,10 +67,15 @@ requireObj = {
 					}
 				}
 			}
-			if (data["require"] && data["require"].length > 1) {
-				var obj = {o0: {}};
-				obj.data = data["require"][1]["thread_list"];
-				setThreadData(JSON.stringify(obj));
+			if (data["require"]) {
+				for (var i = 0; i < data["require"].length; i++) {
+					if (data["require"][i][0] === "MessengerMount") {
+						var obj = {o0: {"data" : {}}};
+						obj["o0"].data = data["require"][i][3][1]["graphqlPayload"]["thread_list"];
+						setThreadData(JSON.stringify(obj));
+						break;
+					}
+				}
 			}
 		}
 	}
