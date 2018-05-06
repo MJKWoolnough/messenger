@@ -248,7 +248,7 @@ type Message struct {
 
 type Messages []Message
 
-func (m Message) Len() int {
+func (m Messages) Len() int {
 	return len(m)
 }
 
@@ -280,7 +280,7 @@ func (c *Client) GetThread(id string) (Messages, error) {
 	for _, node := range list.List.Data.MessageThread.Messages.Nodes {
 		ms = append(ms, Message{
 			Message: node.Message.Text,
-			Sender:  node.Sender,
+			Sender:  node.Sender.ID,
 			Time:    unixToTime(node.Timestamp),
 		})
 	}
