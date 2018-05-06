@@ -257,6 +257,7 @@ func (c *Client) init() error {
 	}
 
 	c.Threads = make(map[string]Thread, len(list.List.Data.Viewer.MessageThreads.Nodes))
+	c.Users = make(map[string]User)
 	if err = c.parseThreadData(list); err != nil {
 		return err
 	}
@@ -313,7 +314,6 @@ func (c *Client) init() error {
 		return errors.WithContext("error running resource scripts: ", err)
 	}
 
-	c.Users = make(map[string]User)
 	return nil
 }
 
