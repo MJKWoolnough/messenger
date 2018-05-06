@@ -1,4 +1,4 @@
-package main
+package messenger
 
 import (
 	"encoding/json"
@@ -45,8 +45,8 @@ type Client struct {
 	docIDs                  map[string]string
 
 	dataMu  sync.RWMutex
-	Threads map[string]Thread
-	Users   map[string]User
+	threads map[string]Thread
+	users   map[string]User
 
 	requestMu sync.Mutex
 	request   uint64
@@ -256,8 +256,8 @@ func (c *Client) init() error {
 		return errors.WithContext("error getting init config: ", err)
 	}
 
-	c.Threads = make(map[string]Thread, len(list.List.Data.Viewer.MessageThreads.Nodes))
-	c.Users = make(map[string]User)
+	c.threads = make(map[string]Thread, len(list.List.Data.Viewer.MessageThreads.Nodes))
+	c.users = make(map[string]User)
 	if err = c.parseThreadData(list); err != nil {
 		return err
 	}
@@ -270,7 +270,7 @@ func (c *Client) init() error {
 	c.postData.Set(sprinkleName, string(buf))
 
 	_, set := bitmap[0]
-	r := NewRLE(set)
+	r := newRLE(set)
 	for i := int64(1); i < highestBit; i++ {
 		_, set = bitmap[i]
 		r.WriteBool(set)

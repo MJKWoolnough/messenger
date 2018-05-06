@@ -1,4 +1,4 @@
-package main
+package messenger
 
 import (
 	"encoding/base64"
@@ -11,15 +11,15 @@ import (
 
 var encoder = base64.NewEncoding("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_").WithPadding(base64.NoPadding)
 
-type RLE struct {
+type rle struct {
 	curr  bool
 	count int
 	buf   boolmap.Slice
 	pos   uint
 }
 
-func NewRLE(start bool) *RLE {
-	r := &RLE{
+func newRLE(start bool) *rle {
+	r := &rle{
 		curr:  start,
 		buf:   make(boolmap.Slice, 256),
 		pos:   1,
@@ -29,7 +29,7 @@ func NewRLE(start bool) *RLE {
 	return r
 }
 
-func (r *RLE) WriteBool(b bool) {
+func (r *rle) WriteBool(b bool) {
 	if b == r.curr {
 		r.count++
 		return
@@ -39,7 +39,7 @@ func (r *RLE) WriteBool(b bool) {
 	r.count = 1
 }
 
-func (r *RLE) add() {
+func (r *rle) add() {
 	bin := strconv.FormatUint(uint64(r.count), 2)
 	r.pos += uint(len(bin)) - 1
 	for _, d := range bin {
@@ -48,7 +48,7 @@ func (r *RLE) add() {
 	}
 }
 
-func (r *RLE) String() string {
+func (r *rle) String() string {
 	r.add()
 	for i, n := range r.buf {
 		r.buf[i] = bits.Reverse8(n)

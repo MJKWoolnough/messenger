@@ -1,4 +1,4 @@
-package main
+package messenger
 
 import (
 	"encoding/json"
@@ -191,12 +191,12 @@ func (c *Client) parseThreadData(list threadList) error {
 		}
 		if thread.Type == ThreadOneToOne {
 			thread.ID = node.ThreadKey.OtherUserID
-			thread.Name = c.Users[node.ThreadKey.OtherUserID].Name
+			thread.Name = c.users[node.ThreadKey.OtherUserID].Name
 		}
 		for _, cparts := range node.Customisation.Participants {
 			thread.ParticipantCustomisation[cparts.ID] = cparts.Nickname
 		}
-		c.Threads[thread.ID] = thread
+		c.threads[thread.ID] = thread
 	}
 	c.dataMu.Unlock()
 	return nil
@@ -276,7 +276,7 @@ func (c *Client) GetThread(id string) (Messages, error) {
 	if list.Error.APIErrorCode != 0 {
 		return nil, list.Error
 	}
-	ms := make(Messages, len(list.List.Data.MessageThread.Messages.Nodes))
+	ms := make(Messages, 0, len(list.List.Data.MessageThread.Messages.Nodes))
 	for _, node := range list.List.Data.MessageThread.Messages.Nodes {
 		ms = append(ms, Message{
 			Message: node.Message.Text,

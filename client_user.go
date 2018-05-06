@@ -1,4 +1,4 @@
-package main
+package messenger
 
 type Gender byte
 
@@ -43,8 +43,8 @@ func (c *Client) SetUser(u User) {
 }
 
 func (c *Client) setUser(u User) {
-	if _, ok := c.Users[u.ID]; ok {
+	if _, ok := c.users[u.ID]; ok {
 		return
 	}
-	c.Users[u.ID] = u
+	c.users[u.ID] = u
 }
