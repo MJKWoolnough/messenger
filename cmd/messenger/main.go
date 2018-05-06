@@ -9,6 +9,8 @@ import (
 	"os/signal"
 	"os/user"
 	"path/filepath"
+
+	"github.com/MJKWoolnough/messenger"
 )
 
 func e(explain string, err error) {
@@ -66,10 +68,10 @@ func main() {
 		e("error closing config file (reading)", f.Close())
 	}
 
-	client := NewClient(config.Cookies)
+	client := messenger.NewClient(config.Cookies)
 
 	if len(config.Cookies) > 0 {
-		if err = client.Resume(); err == ErrInvalidCookies {
+		if err = client.Resume(); err == messenger.ErrInvalidCookies {
 			config.Cookies = nil
 		} else if err != nil {
 			e("error validating cookies", err)
@@ -77,7 +79,7 @@ func main() {
 	}
 	if len(config.Cookies) == 0 && config.Username != "" {
 		err = client.Login(config.Username, config.Password)
-		if err != ErrInvalidLogin {
+		if err != messenger.ErrInvalidLogin {
 			e("error logging in with saved credentials", err)
 		}
 		config.Cookies = client.GetCookies()
@@ -88,7 +90,7 @@ func main() {
 			username, password, err = UI.GetUserPass()
 			e("error getting username/password: ", err)
 			err = client.Login(username, password)
-			if err == ErrInvalidLogin {
+			if err == messenger.ErrInvalidLogin {
 				UI.ShowError("Invalid Login Credentials")
 				continue
 			}
@@ -105,8 +107,6 @@ func main() {
 	e("error opening config file for writing", err)
 	e("error encoding config file", json.NewEncoder(f).Encode(config))
 	e("error closing config file (writing)", f.Close())
-
-	e("error getting list", client.GetList())
 
 	cc <- struct{}{}
 	<-cc
