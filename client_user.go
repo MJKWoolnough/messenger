@@ -38,7 +38,11 @@ type User struct {
 
 func (c *Client) SetUser(u User) {
 	c.dataMu.Lock()
-	defer c.dataMu.Unlock()
+	c.setUser(u)
+	c.dataMu.Unlock()
+}
+
+func (c *Client) setUser(u User) {
 	if _, ok := c.Users[u.ID]; ok {
 		return
 	}

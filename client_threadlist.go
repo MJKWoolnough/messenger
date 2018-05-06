@@ -180,7 +180,7 @@ func (c *Client) parseThreadData(list threadList) error {
 			thread.LastMessage.Time = unixToTime(lm.Timestamp)
 		}
 		for _, user := range node.Participants.Nodes {
-			c.SetUser(User{
+			c.setUser(User{
 				ID:        user.MessagingActor.ID,
 				Name:      user.MessagingActor.Name,
 				ShortName: user.MessagingActor.ShortName,
