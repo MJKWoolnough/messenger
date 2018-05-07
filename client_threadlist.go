@@ -144,7 +144,7 @@ func (c *Client) UpdateThreadList() error {
 	post.Set("batch_name", "MessengerGraphQLThreadlistFetcher")
 	post.Set("queries", fmt.Sprintf("{\"o0\":{\"doc_id\":%q,\"query_params\":{\"limit\":99,\"before\":null,\"tags\":[],\"isWorkUser\":0,\"includeDeliveryReceipts\":true,\"includeSeqID\":false}}}", c.docIDs["MessengerGraphQLThreadlistFetcher"]))
 
-	resp, err := c.PostForm(cAPIURL, post)
+	resp, err := c.postForm(cAPIURL, post)
 	if err != nil {
 		return errors.WithContext("error getting thread list: ", err)
 	}
@@ -264,7 +264,7 @@ func (c *Client) GetThread(id string) (Messages, error) {
 	post := make(url.Values)
 	post.Set("batch_name", "MessengerGraphQLThreadFetcher")
 	post.Set("queries", fmt.Sprintf("{\"o0\":{\"doc_id\":%q,\"query_params\":{\"id\":%q,\"message_limit\":20,\"load_messages\":1,\"load_read_receipts\":false,\"before\":null}}}", c.docIDs["MessengerGraphQLThreadFetcher"], id))
-	resp, err := c.PostForm(cAPIURL, post)
+	resp, err := c.postForm(cAPIURL, post)
 	if err != nil {
 		return nil, errors.WithContext("error getting thread messages: ", err)
 	}

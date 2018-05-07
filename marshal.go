@@ -33,7 +33,7 @@ func (c *Client) MarshalJSONWriter(w io.Writer) error {
 	c.requestMu.Lock()
 	c.dataMu.RLock()
 	data := clientJSON{
-		Cookies:       c.Client.Jar.Cookies(domain),
+		Cookies:       c.client.Jar.Cookies(domain),
 		PostData:      c.postData,
 		DocIDs:        c.docIDs,
 		Username:      c.username,
@@ -42,7 +42,7 @@ func (c *Client) MarshalJSONWriter(w io.Writer) error {
 	}
 	c.dataMu.RUnlock()
 	c.requestMu.Unlock()
-	if err := json.NewEncoder(w).Encoder(data); err != nil {
+	if err := json.NewEncoder(w).Encode(data); err != nil {
 		return errors.WithContext("error marshaling JSON: ", err)
 	}
 	return nil
@@ -60,9 +60,9 @@ func (c *Client) UnmarshalJSONReader(r io.Reader) error {
 	if err := json.NewDecoder(r).Decode(&data); err != nil {
 		return errors.WithContext("error unmarshaling JSON: ", err)
 	}
-	c.Client.Jar = cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	c.client.Jar, _ = cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if len(data.Cookies) > 0 {
-		c.Client.Jar.SetCookies(domain, data.Cookies)
+		c.client.Jar.SetCookies(domain, data.Cookies)
 	}
 	c.postData = data.PostData
 	c.docIDs = data.DocIDs

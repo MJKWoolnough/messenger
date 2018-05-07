@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/cookiejar"
 	"net/url"
 	"strconv"
 	"strings"
@@ -15,7 +14,6 @@ import (
 	"github.com/MJKWoolnough/errors"
 	"github.com/MJKWoolnough/memio"
 	"github.com/robertkrimen/otto"
-	"golang.org/x/net/publicsuffix"
 	xmlpath "gopkg.in/xmlpath.v2"
 )
 
@@ -39,7 +37,7 @@ func init() {
 }
 
 type Client struct {
-	http.Client
+	client                  http.Client
 	postData                url.Values
 	username, usernameShort string
 	docIDs                  map[string]string
@@ -52,19 +50,10 @@ type Client struct {
 	request   uint64
 }
 
-func NewClient(cookies []*http.Cookie) *Client {
-	var client Client
-	client.Jar, _ = cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
-	if len(cookies) > 0 {
-		client.Jar.SetCookies(domain, cookies)
-	}
-	return &client
-}
-
 func (c *Client) Resume() error {
-	c.CheckRedirect = noRedirect
-	resp, err := c.Get(cLoginURL)
-	c.CheckRedirect = nil
+	c.client.CheckRedirect = noRedirect
+	resp, err := c.client.Get(cLoginURL)
+	c.client.CheckRedirect = nil
 	if err != nil {
 		return err
 	}
@@ -75,7 +64,7 @@ func (c *Client) Resume() error {
 }
 
 func (c *Client) Login(username, password string) error {
-	resp, err := c.Get(cLoginURL)
+	resp, err := c.client.Get(cLoginURL)
 	if err != nil {
 		return errors.WithContext("error getting login page: ", err)
 	}
@@ -104,7 +93,7 @@ func (c *Client) Login(username, password string) error {
 		return ErrDatrCookie
 
 	}
-	c.Jar.SetCookies(domain, []*http.Cookie{
+	c.client.Jar.SetCookies(domain, []*http.Cookie{
 		&http.Cookie{
 			Name:     "datr",
 			Value:    cookieValue,
@@ -138,14 +127,14 @@ func (c *Client) Login(username, password string) error {
 	inputs.Set("pass", password)
 	inputs.Set("login", "1")
 	inputs.Set("persistant", "1")
-	c.CheckRedirect = noRedirect
-	resp, err = c.PostForm(postURL, inputs)
+	c.client.CheckRedirect = noRedirect
+	resp, err = c.postForm(postURL, inputs)
 	if err != nil {
 		return errors.WithContext("error POSTing login form: ", err)
 	}
 
 	var goodCookies bool
-	for _, cookie := range c.GetCookies() {
+	for _, cookie := range c.client.Jar.Cookies(domain) {
 		if cookie.Name == "c_user" {
 			_, err = strconv.ParseUint(cookie.Value, 10, 64)
 			if err != nil {
@@ -163,16 +152,12 @@ func (c *Client) Login(username, password string) error {
 	return c.init()
 }
 
-func (c *Client) GetCookies() []*http.Cookie {
-	return c.Jar.Cookies(domain)
-}
-
 func noRedirect(_ *http.Request, _ []*http.Request) error {
 	return http.ErrUseLastResponse
 }
 
 func (c *Client) init() error {
-	resp, err := c.Get(cDomain)
+	resp, err := c.client.Get(cDomain)
 	if err != nil {
 		return errors.WithContext("error grabbing init page: ", err)
 	}
@@ -284,7 +269,7 @@ func (c *Client) init() error {
 	for _, resource := range resources {
 		for _, url := range resource {
 			if _, ok := loaded[url]; !ok {
-				resp, err := c.Get(url)
+				resp, err := c.client.Get(url)
 				if err != nil {
 					return errors.WithContext("error getting resource: ", err)
 				}
@@ -317,7 +302,7 @@ func (c *Client) init() error {
 	return nil
 }
 
-func (c *Client) PostForm(url string, data url.Values) (*http.Response, error) {
+func (c *Client) postForm(url string, data url.Values) (*http.Response, error) {
 	for key := range c.postData {
 		data.Set(key, c.postData.Get(key))
 	}
@@ -326,7 +311,7 @@ func (c *Client) PostForm(url string, data url.Values) (*http.Response, error) {
 	req := c.request
 	c.requestMu.Unlock()
 	data.Set("__req", strconv.FormatUint(req, 36))
-	return c.Client.PostForm(url, data)
+	return c.client.PostForm(url, data)
 }
 
 const (
