@@ -50,6 +50,7 @@ type Client struct {
 	request   uint64
 }
 
+/*
 func (c *Client) Resume() error {
 	c.client.CheckRedirect = noRedirect
 	resp, err := c.client.Get(cLoginURL)
@@ -62,16 +63,18 @@ func (c *Client) Resume() error {
 	}
 	return c.init()
 }
+*/
 
-func (c *Client) Login(username, password string) error {
+func Login(username, password string) (*Client, error) {
+	var c Client
 	resp, err := c.client.Get(cLoginURL)
 	if err != nil {
-		return errors.WithContext("error getting login page: ", err)
+		return nil, errors.WithContext("error getting login page: ", err)
 	}
 	nodes, err := xmlpath.ParseHTML(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return errors.WithContext("error parsing login page: ", err)
+		return nil, errors.WithContext("error parsing login page: ", err)
 	}
 	var (
 		cookieSet   bool
@@ -87,10 +90,10 @@ func (c *Client) Login(username, password string) error {
 		},
 		xmlPathIter{pageScripts.Iter(nodes)},
 	); err != nil {
-		return errors.WithContext("error grabbing datr cookie: ", err)
+		return nil, errors.WithContext("error grabbing datr cookie: ", err)
 	}
 	if !cookieSet {
-		return ErrDatrCookie
+		return nil, ErrDatrCookie
 
 	}
 	c.client.Jar.SetCookies(domain, []*http.Cookie{
@@ -107,11 +110,11 @@ func (c *Client) Login(username, password string) error {
 	if loginURLP := xmlpath.MustCompile("//form/@action").Iter(nodes); loginURLP.Next() {
 		action, err := url.Parse(loginURLP.Node().String())
 		if err != nil {
-			return errors.WithContext("error parsing login URL: ", err)
+			return nil, errors.WithContext("error parsing login URL: ", err)
 		}
 		postURL = loginURL.ResolveReference(action).String()
 	} else {
-		return errors.Error("error retrieving login POST URL")
+		return nil, errors.Error("error retrieving login POST URL")
 	}
 
 	inputs := make(url.Values)
@@ -130,7 +133,7 @@ func (c *Client) Login(username, password string) error {
 	c.client.CheckRedirect = noRedirect
 	resp, err = c.postForm(postURL, inputs)
 	if err != nil {
-		return errors.WithContext("error POSTing login form: ", err)
+		return nil, errors.WithContext("error POSTing login form: ", err)
 	}
 
 	var goodCookies bool
@@ -138,7 +141,7 @@ func (c *Client) Login(username, password string) error {
 		if cookie.Name == "c_user" {
 			_, err = strconv.ParseUint(cookie.Value, 10, 64)
 			if err != nil {
-				return errors.WithContext("error parsing userID:", err)
+				return nil, errors.WithContext("error parsing userID:", err)
 			}
 			goodCookies = true
 			break
@@ -146,10 +149,13 @@ func (c *Client) Login(username, password string) error {
 	}
 
 	if !goodCookies {
-		return ErrInvalidLogin
+		return nil, ErrInvalidLogin
 	}
 
-	return c.init()
+	if err = c.init(); err != nil {
+		return nil, err
+	}
+	return &c, nil
 }
 
 func noRedirect(_ *http.Request, _ []*http.Request) error {

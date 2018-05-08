@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"os/user"
@@ -23,7 +22,7 @@ func e(explain string, err error) {
 }
 
 type Config struct {
-	Cookies            []*http.Cookie
+	Client             *messenger.Client
 	SaveCredentials    bool
 	Username, Password string
 	Aliases            map[uint]string
@@ -68,34 +67,30 @@ func main() {
 		e("error closing config file (reading)", f.Close())
 	}
 
-	client := messenger.NewClient(config.Cookies)
-
-	if len(config.Cookies) > 0 {
-		if err = client.Resume(); err == messenger.ErrInvalidCookies {
-			config.Cookies = nil
+	if config.Client != nil {
+		if err = config.Client.Resume(); err == messenger.ErrInvalidCookies {
+			config.Client = nil
 		} else if err != nil {
 			e("error validating cookies", err)
 		}
 	}
-	if len(config.Cookies) == 0 && config.Username != "" {
-		err = client.Login(config.Username, config.Password)
+	if config.Client == nil && config.Username != "" {
+		config.Client, err = messenger.Login(config.Username, config.Password)
 		if err != messenger.ErrInvalidLogin {
 			e("error logging in with saved credentials", err)
 		}
-		config.Cookies = client.GetCookies()
 	}
-	if len(config.Cookies) == 0 {
+	if config.Client == nil {
 		var username, password string
 		for {
 			username, password, err = UI.GetUserPass()
 			e("error getting username/password: ", err)
-			err = client.Login(username, password)
+			config.Client, err = messenger.Login(username, password)
 			if err == messenger.ErrInvalidLogin {
 				UI.ShowError("Invalid Login Credentials")
 				continue
 			}
 			e("error logging in", err)
-			config.Cookies = client.GetCookies()
 			break
 		}
 		if config.SaveCredentials {
