@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"sync/atomic"
 
 	"github.com/MJKWoolnough/errors"
 	"github.com/MJKWoolnough/memio"
@@ -30,7 +31,6 @@ func (c *Client) MarshalJSON() ([]byte, error) {
 }
 
 func (c *Client) MarshalJSONWriter(w io.Writer) error {
-	c.requestMu.Lock()
 	c.dataMu.RLock()
 	data := clientJSON{
 		Cookies:       c.client.Jar.Cookies(domain),
@@ -38,10 +38,9 @@ func (c *Client) MarshalJSONWriter(w io.Writer) error {
 		DocIDs:        c.docIDs,
 		Username:      c.username,
 		UsernameShort: c.usernameShort,
-		Request:       c.request,
+		Request:       atomic.LoadUint64(&c.request),
 	}
 	c.dataMu.RUnlock()
-	c.requestMu.Unlock()
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		return errors.WithContext("error marshaling JSON: ", err)
 	}
@@ -68,7 +67,7 @@ func (c *Client) UnmarshalJSONReader(r io.Reader) error {
 	c.docIDs = data.DocIDs
 	c.username = data.Username
 	c.usernameShort = data.UsernameShort
-	c.request = data.Request
+	atomic.StoreUint64(&c.request, data.Request)
 	c.threads = make(map[string]Thread)
 	c.users = make(map[string]User)
 	return nil

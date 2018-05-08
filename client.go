@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/MJKWoolnough/errors"
@@ -42,12 +43,11 @@ type Client struct {
 	username, usernameShort string
 	docIDs                  map[string]string
 
+	request uint64 // atomic
+
 	dataMu  sync.RWMutex
 	threads map[string]Thread
 	users   map[string]User
-
-	requestMu sync.Mutex
-	request   uint64
 }
 
 /*
@@ -312,11 +312,7 @@ func (c *Client) postForm(url string, data url.Values) (*http.Response, error) {
 	for key := range c.postData {
 		data.Set(key, c.postData.Get(key))
 	}
-	c.requestMu.Lock()
-	c.request++
-	req := c.request
-	c.requestMu.Unlock()
-	data.Set("__req", strconv.FormatUint(req, 36))
+	data.Set("__req", strconv.FormatUint(atomic.AddUint64(&c.request, 1), 36))
 	return c.client.PostForm(url, data)
 }
 
