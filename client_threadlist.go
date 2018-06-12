@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/MJKWoolnough/errors"
+	"vimagination.zapto.org/errors"
 )
 
 type ThreadType int

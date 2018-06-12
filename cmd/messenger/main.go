@@ -1,4 +1,4 @@
-package main
+package main // import "vimagination.zapto.org/messenger/cmd/messenger"
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"os/user"
 	"path/filepath"
 
-	"github.com/MJKWoolnough/messenger"
+	"vimagination.zapto.org/messenger"
 )
 
 func e(explain string, err error) {

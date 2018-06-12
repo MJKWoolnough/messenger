@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/MJKWoolnough/boolmap"
+	"vimagination.zapto.org/boolmap"
 )
 
 var encoder = base64.NewEncoding("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_").WithPadding(base64.NoPadding)

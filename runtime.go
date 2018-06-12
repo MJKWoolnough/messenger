@@ -3,7 +3,7 @@ package messenger
 import (
 	"time"
 
-	"github.com/MJKWoolnough/errors"
+	"vimagination.zapto.org/errors"
 	"github.com/robertkrimen/otto"
 	"github.com/robertkrimen/otto/parser"
 	"github.com/robertkrimen/otto/registry"

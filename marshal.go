@@ -7,9 +7,9 @@ import (
 	"net/url"
 	"sync/atomic"
 
-	"github.com/MJKWoolnough/byteio"
-	"github.com/MJKWoolnough/errors"
-	"github.com/MJKWoolnough/memio"
+	"vimagination.zapto.org/byteio"
+	"vimagination.zapto.org/errors"
+	"vimagination.zapto.org/memio"
 )
 
 type clientJSON struct {

@@ -1,10 +1,11 @@
-package messenger
+package messenger // import "vimagination.zapto.org/messenger"
 
 import (
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"strconv"
 	"strings"
@@ -12,10 +13,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/MJKWoolnough/errors"
-	"github.com/MJKWoolnough/memio"
 	"github.com/robertkrimen/otto"
+	"golang.org/x/net/publicsuffix"
 	xmlpath "gopkg.in/xmlpath.v2"
+	"vimagination.zapto.org/errors"
+	"vimagination.zapto.org/memio"
 )
 
 const CLIENT_VERSION = 3822019
@@ -65,8 +67,14 @@ func (c *Client) Resume() error {
 }
 */
 
+func newJar() *cookiejar.Jar {
+	jar, _ := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	return jar
+}
+
 func Login(username, password string) (*Client, error) {
 	var c Client
+	c.client.Jar = newJar()
 	resp, err := c.client.Get(cLoginURL)
 	if err != nil {
 		return nil, errors.WithContext("error getting login page: ", err)
